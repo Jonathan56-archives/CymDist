@@ -45,8 +45,8 @@ la.SetDemand(networks[0], demand)
 la.Run([networks[0]])
 
 # Visualize the results
-report_name = 'Load Allocation - Distributed Load Differences'
-report_filename = 'D:\\Users\\Jonathan\\Documents\\GitHub\\cymdist\\'
+report_name = 'Load Allocation - Spot Load Differences'
+report_filename = 'D:\\Users\\Jonathan\\Documents\\GitHub\\cymdist\\my_report.xml'
 
 # Saves the report
 cympy.rm.Save(report_name, cympy.study.ListNetworks(), cympy.enums.ReportModeType.XML, report_filename)
