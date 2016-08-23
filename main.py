@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
-import function
 import cympy
+
+import sys
+sys.path.append("D:\\Users\\Jonathan\\Documents\\GitHub\\cymdist")
+import function
 
 # Open a study
 filename = 'C:\\Users\\emma\\Documents\\SCE Cymdist\\PIANO_20140718.sxst'

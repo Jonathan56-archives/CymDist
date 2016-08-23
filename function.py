@@ -34,7 +34,7 @@ def list_devices(device_type=False, verbose=True):
         for value in device_types:
             d[value] += 1
 
-        for key, value in d.iteritems():
+        for key, value in d.items():
             print('There are ' + str(value) + ' ' + lookup.type_table[key])
 
     return devices
