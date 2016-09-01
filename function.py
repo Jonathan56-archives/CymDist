@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
 import cympy
+import cympy.rm
+import pandas
 import lookup
 
 
@@ -12,7 +14,7 @@ def list_devices(device_type=False, verbose=True):
         verbose (Boolean): if True print result (default True)
 
     Return:
-        list <devices>
+        DataFrame <device, device_type, device_number, device_type_id>
     """
     
     # Get the list of devices
@@ -21,26 +23,29 @@ def list_devices(device_type=False, verbose=True):
     else:
         # Get all devices
         devices = cympy.study.ListDevices()
+    
+    # Create a dataframe
+    devices = pandas.DataFrame(devices, columns=['device'])
+    devices['device_type_id'] = devices['device'].apply(lambda x: x.DeviceType)
+    devices['device_number'] = devices['device'].apply(lambda x: x.DeviceNumber)
+    devices['device_type'] = devices['device_type_id'].apply(lambda x: lookup.type_table[x])
 
-    # Get the break down of each type (would be easier with pandas)
+    # Get the break down of each type
     if verbose:
-        # Get all the different types in the list of devices
-        device_types = [value.DeviceType for value in devices]
-
-        # Get a dictionnary with unique ID
-        d = {key: value for (key, value) in zip(set(device_types), [0] * len(device_types))}
-
-        # Get the rigth count for each category
-        for value in device_types:
-            d[value] += 1
-
-        for key, value in d.items():
-            print('There are ' + str(value) + ' ' + lookup.type_table[key])
+        unique_type = devices['device_type'].unique().tolist()
+        for device_type in unique_type:
+            print('There are ' + str(devices[devices.device_type == device_type].count()[0]) +
+                  ' ' + device_type)
 
     return devices
 
 
-def get_device(id, device_type, verbose=True):
+def _describe_object(device):
+        for value in cympy.dm.Describe(device.GetObjType()):
+            print(value.Name)    
+
+
+def get_device(id, device_type, verbose=False):
     """Return a device
 
     Args:
@@ -56,7 +61,7 @@ def get_device(id, device_type, verbose=True):
 
     # Describe attributes
     if verbose:
-        print(cympy.dm.Describe(device.GetObjType()))
+        _describe_object(device)
 
     return device
 
@@ -77,15 +82,15 @@ def load_allocation(values):
     # Fill in the demand values
     demand.IsTotalDemand = False
     demand.DemandA = cympy.sim.LoadValue()
-    demand.DemandA.Value1 = values['value1_A']
-    demand.DemandA.Value2 = values['value2_A']
+    demand.DemandA.Value1 = values['P_A']
+    demand.DemandA.Value2 = values['Q_A']
     demand.DemandB = cympy.sim.LoadValue()
-    demand.DemandB.Value1 = values['value1_B']
-    demand.DemandB.Value2 = values['value2_B']
+    demand.DemandB.Value1 = values['P_B']
+    demand.DemandB.Value2 = values['Q_B']
     demand.DemandC = cympy.sim.LoadValue()
-    demand.DemandC.Value1 = values['value1_C']
-    demand.DemandC.Value2 = values['value2_C']
-    demand.LoadValueType = cympy.enums.LoadValueType.KVA_PF
+    demand.DemandC.Value1 = values['P_C']
+    demand.DemandC.Value2 = values['Q_C']
+    demand.LoadValueType = cympy.enums.LoadValueType.KW_KVAR
 
     # Get a list of networks
     networks = cympy.study.ListNetworks()
