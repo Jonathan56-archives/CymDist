@@ -16,14 +16,14 @@ def list_devices(device_type=False, verbose=True):
     Return:
         DataFrame <device, device_type, device_number, device_type_id>
     """
-    
+
     # Get the list of devices
     if device_type:
         devices = cympy.study.ListDevices(device_type)
     else:
         # Get all devices
         devices = cympy.study.ListDevices()
-    
+
     # Create a dataframe
     devices = pandas.DataFrame(devices, columns=['device'])
     devices['device_type_id'] = devices['device'].apply(lambda x: x.DeviceType)
@@ -42,7 +42,7 @@ def list_devices(device_type=False, verbose=True):
 
 def _describe_object(device):
         for value in cympy.dm.Describe(device.GetObjType()):
-            print(value.Name)    
+            print(value.Name)
 
 
 def get_device(id, device_type, verbose=False):
@@ -102,6 +102,45 @@ def load_allocation(values):
     la.Run([networks[0]])
 
 
+def get_high_voltage_bus():
+    """
+    """
+    # Get a list of all the bus
+
+    # Get the according voltage per bus in a pandas dataframe
+    pass
+
+
+def get_low_voltage_bus():
+    """
+    """
+    pass
+
+
+def get_line_overload():
+    """
+    """
+    pass
+
+
+def get_transformater_overload():
+    """
+    """
+    pass
+
+
+def get_substation_load():
+    """
+    """
+    pass
+
+
+def get_unbalanced_line():
+    """
+    """
+    pass
+
+
 def get_report(report_name, verbose=True):
     """
     """
@@ -110,6 +149,6 @@ def get_report(report_name, verbose=True):
 
     # Saves the report
     cympy.rm.Save(report_name, cympy.study.ListNetworks(), cympy.enums.ReportModeType.XML, report_filename)
-    
+
     if verbose:
         print('Report successfully saved!')
