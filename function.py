@@ -4,6 +4,8 @@ import cympy
 import cympy.rm
 import pandas
 import lookup
+# For uPMU database query
+import btrdb
 
 
 def list_devices(device_type=False, verbose=True):
@@ -64,6 +66,38 @@ def get_device(id, device_type, verbose=False):
         _describe_object(device)
 
     return device
+
+
+def add_device(device_name, device_type, section_id):
+    """Return a device
+
+    Args:
+        device_name (String): unique identifier
+        device_type (DeviceType): type of device
+        section_id (String): unique identifier
+
+    Return:
+        Device (Device)
+    """
+    return cympy.study.AddDevice(device_name, device_type, section_id)
+
+
+def add_pv(device_name, section_id, ns=100, np=100, location="To"):
+    """Return a device
+
+    Args:
+        device_name (String): unique identifier
+        section_id (String): unique identifier
+        ns (Int): number of pannel in serie (* 17.3 to find voltage)
+        np (Int): number of pannel in parallel (ns * np * 0.08 to find kW)
+        location (String): To or From 
+
+    Return:
+        Device (Device)
+    """
+    my_pv = add_device(device_name, cympy.enums.DeviceType.Photovoltaic, section_id)
+    my_pv.SetValue(location, "Location")
+    return my_pv
 
 
 def load_allocation(values):
@@ -299,3 +333,47 @@ def get_report(report_name, verbose=True):
 
     if verbose:
         print('Report successfully saved!')
+
+
+def get_upmu_data(inputdt, upmu_path):
+    """ Retrieves instantaneous P, Q, and voltage magnitude for specified datetime.
+    
+    Args:
+        inputdt (datetime): timezone aware datetime object
+        upmu_path (str): e.g., '/LBNL/grizzly_bus1/'
+    Returns:
+        {'P_A': , 'Q_A': , 'P_B': , 'Q_B': , 'P_C': , 'Q_C': , 
+         'units': ('kW', 'kVAR'), 
+         'VMAG_A': , 'VMAG_B': , 'VMAG_C': }
+    """
+    
+    bc = btrdb.HTTPConnection("miranda.cs.berkeley.edu")
+    ur = btrdb.UUIDResolver("miranda.cs.berkeley.edu", "uuidresolver", "uuidpass", "upmu")
+    
+    # convert dt to nanoseconds since epoch
+    epochns = btrdb.date(inputdt.strftime('%Y-%m-%dT%H:%M:%S'))
+    
+    # retrieve raw data from btrdb
+    upmu_data = {}
+    streams = ['L1MAG', 'L2MAG', 'L3MAG', 'C1MAG', 'C2MAG', 'C3MAG', 'L1ANG', 'L2ANG', 'L3ANG', 'C1ANG', 'C2ANG', 'C3ANG']
+    for s in streams:
+        pt = bc.get_stat(ur.resolve(upmu_path + s), epochns, epochns + int(9e6))
+        upmu_data[s] = pt[0][2]
+        
+    output_dict = {}
+
+    output_dict['P_A'] = (upmu_data['L1MAG']*upmu_data['C1MAG']*np.cos(upmu_data['L1ANG'] - upmu_data['C1ANG']))*1e-3
+    output_dict['Q_A'] = (upmu_data['L1MAG']*upmu_data['C1MAG']*np.sin(upmu_data['L1ANG'] - upmu_data['C1ANG']))*1e-3
+
+    output_dict['P_B'] = (upmu_data['L2MAG']*upmu_data['C2MAG']*np.cos(upmu_data['L2ANG'] - upmu_data['C2ANG']))*1e-3
+    output_dict['Q_B'] = (upmu_data['L2MAG']*upmu_data['C2MAG']*np.sin(upmu_data['L2ANG'] - upmu_data['C2ANG']))*1e-3
+
+    output_dict['P_C'] = (upmu_data['L3MAG']*upmu_data['C3MAG']*np.cos(upmu_data['L3ANG'] - upmu_data['C3ANG']))*1e-3
+    output_dict['Q_C'] = (upmu_data['L3MAG']*upmu_data['C3MAG']*np.sin(upmu_data['L3ANG'] - upmu_data['C3ANG']))*1e-3
+
+    output_dict['units'] = ('kW', 'kVAR', 'V')
+
+    output_dict['VMAG_A'] = upmu_data['L1MAG']
+    output_dict['VMAG_B'] = upmu_data['L2MAG']
+    output_dict['VMAG_C'] = upmu_data['L3MAG']
+    return output_dict
