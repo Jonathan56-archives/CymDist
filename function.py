@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
 import cympy
-import cympy.rm
 import pandas
 import lookup
 # For uPMU database query
@@ -170,47 +169,7 @@ def get_voltage(devices):
     return voltage
 
 
-def get_high_voltage(devices, first_n_devices=10):
-    """
-    Args:
-        devices (DataFrame): list of all the devices to include
-        first_n_devices (Int): number of row to return
-
-    Return:
-        high_voltage_device (DataFrame): return the n devices with the highest voltage 
-    """
-    # Get all the voltage
-    voltage = get_voltage(devices)
-
-    # Sort out the voltage
-    voltage['maximum_voltage_ABC'] = voltage[['voltage_A', 'voltage_B', 'voltage_C']].max(axis=1)
-    voltage = voltage.sort_values('maximum_voltage_ABC', ascending=False)
-    voltage = voltage.drop(['maximum_voltage_ABC'], axis=1)
-
-    return voltage[0:first_n_devices]
-
-
-def get_low_voltage(devices, first_n_devices=10):
-    """
-    Args:
-        devices (DataFrame): list of all the devices to include
-        first_n_devices (Int): number of row to return
-
-    Return:
-        low_voltage_device (DataFrame): return the n devices with the lowest voltage 
-    """
-    # Get all the voltage
-    voltage = get_voltage(devices)
-
-    # Sort out the voltage
-    voltage['minimum_voltage_ABC'] = voltage[['voltage_A', 'voltage_B', 'voltage_C']].min(axis=1)
-    voltage = voltage.sort_values('minimum_voltage_ABC', ascending=True)
-    voltage = voltage.drop(['minimum_voltage_ABC'], axis=1)
-
-    return voltage[0:first_n_devices]
-
-
-def get_overload(devices, first_n_devices=10):
+def get_overload(devices):
     """
     Args:
         devices (DataFrame): list of all the devices to include
@@ -240,12 +199,7 @@ def get_overload(devices, first_n_devices=10):
     for column in ['overload_A', 'overload_B', 'overload_C']:
         overload[column] = overload[column].apply(lambda x: None if x is '' else float(x))
 
-    # Sort out the overload
-    overload['maximum_overload_ABC'] = overload[['overload_A', 'overload_B', 'overload_C']].max(axis=1)
-    overload = overload.sort_values('maximum_overload_ABC', ascending=False)
-    overload = overload.drop(['maximum_overload_ABC'], axis=1)
-
-    return overload[0:first_n_devices]
+    return overload
 
 
 def get_load(devices):
@@ -296,8 +250,9 @@ def get_load(devices):
     return load
 
 
-def get_unbalanced_line(devices, first_n_devices=10):
-    """
+def get_unbalanced_line(devices):
+    """This function requires the get_voltage function has been called before
+
     Args:
         devices (DataFrame): list of all the devices to include
         first_n_devices (Int): number of row to return
@@ -318,22 +273,8 @@ def get_unbalanced_line(devices, first_n_devices=10):
             diff.append(abs(value[phase] - value['mean_voltage_ABC']) * 100 / value['mean_voltage_ABC'])
         return max(diff)
     voltage['diff_with_mean'] = voltage[['mean_voltage_ABC', 'voltage_A', 'voltage_B', 'voltage_C']].apply(_diff, axis=1)
-    voltage = voltage.sort_values('diff_with_mean', ascending=False)
 
-    return voltage[voltage.diff_with_mean >= 2][0:first_n_devices]
-
-
-def get_report(report_name, verbose=True):
-    """
-    """
-    # Filename for the report
-    report_filename = 'D:\\Users\\Jonathan\\Documents\\GitHub\\cymdist\\my_report.xml'
-
-    # Saves the report
-    cympy.rm.Save(report_name, cympy.study.ListNetworks(), cympy.enums.ReportModeType.XML, report_filename)
-
-    if verbose:
-        print('Report successfully saved!')
+    return voltage
 
 
 def get_upmu_data(inputdt, upmu_path):
