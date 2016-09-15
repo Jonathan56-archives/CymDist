@@ -6,9 +6,10 @@ import pandas
 import lookup
 # For uPMU database query
 import btrdb
+import numpy as np
 
 
-def list_devices(device_type=False, verbose=True):
+def list_devices(device_type=False, verbose=False):
     """List all devices and return a break down of their type
 
     Args:
