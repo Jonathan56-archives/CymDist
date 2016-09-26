@@ -250,6 +250,31 @@ def get_load(devices):
     return load
 
 
+def get_distance(devices):
+    """
+    Args:
+        devices (DataFrame): list of all the devices to include
+
+    Return:
+        devices_distance (DataFrame): devices and their corresponding distance from the substation
+    """
+    distance = devices.copy()
+    
+    # Reset or create new columns to hold the result
+    distance['distance'] = [0] * len(distance)
+
+    for device in devices.itertuples():
+        # Get the according distance in a pandas dataframe
+        distance.loc[device.Index, 'distance'] = cympy.study.QueryInfoDevice(
+            "Distance", device.device_number, int(device.device_type_id))
+
+    # Cast the right type
+    for column in ['distance']:
+        distance[column] = distance[column].apply(lambda x: None if x is '' else float(x))
+
+    return distance
+
+
 def get_unbalanced_line(devices):
     """This function requires the get_voltage function has been called before
 
