@@ -5,7 +5,7 @@ def get_high_voltage(devices, first_n_devices=10):
         first_n_devices (Int): number of row to return
 
     Return:
-        high_voltage_device (DataFrame): return the n devices with the highest voltage 
+        high_voltage_device (DataFrame): return the n devices with the highest voltage
     """
     # Get all the voltage
     voltage = get_voltage(devices)
