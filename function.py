@@ -132,6 +132,14 @@ def load_allocation(values):
     # Set the first feeders demand
     la.SetDemand(networks[0], demand)
 
+    # Set up the right voltage [V to kV]
+    cympy.study.SetValueTopo(values['VMAG_A'] / 1000,
+        "Sources[0].EquivalentSourceModels[0].EquivalentSource.OperatingVoltage1", networks[0])
+    cympy.study.SetValueTopo(values['VMAG_B'] / 1000,
+        "Sources[0].EquivalentSourceModels[0].EquivalentSource.OperatingVoltage2", networks[0])
+    cympy.study.SetValueTopo(values['VMAG_C'] / 1000,
+        "Sources[0].EquivalentSourceModels[0].EquivalentSource.OperatingVoltage3", networks[0])
+
     # Run the load allocation
     la.Run([networks[0]])
 
