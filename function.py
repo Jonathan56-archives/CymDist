@@ -3,9 +3,67 @@ from __future__ import division
 import cympy
 import pandas
 import lookup
+import pickle
 # For uPMU database query
 import btrdb
 import numpy as np
+
+
+def fmu_wrapper(model_filename, input_values, input_names,
+                output_names, output_device_name, write_result):
+    """Communicate with the FMU to launch a Cymdist simulation
+
+    Args:
+        model_filename (String): path to the cymdist grid model
+        input_values (List): list of float with the same order as input_names
+        input_names (List): list of String to describe the list of values
+        output_names (List): list of String setting the value to output [voltage_A, voltage_B, ...]
+        output_device_name (String): name of a device to select one row in the results
+        write_result (Boolean): if True the entire result are saved to the file system
+    """
+
+    # Open the model
+    cympy.study.Open(model_filename)
+
+    # Create a dictionary from the input values and input names
+    udata = {}
+    for name, value in zip(input_names, input_values):
+        udata[name] = value
+
+    # Run load allocation function to set input values
+    load_allocation(udata)
+
+    # Run the power flow
+    lf = cympy.sim.LoadFlow()
+    lf.Run()
+
+    # Get the full output data <--- optimize this part to gain time
+    devices = list_devices()
+    devices = get_voltage(devices)
+    devices = get_overload(devices)
+    devices = get_load(devices)
+    devices = get_unbalanced_line(devices)
+    devices = get_distance(devices)
+
+    # Write full results?
+    if write_result:
+        with open(model_filename + '_result_.pickle', 'wb') as output_file:
+            pickle.dump(devices, output_file, protocol=2)
+
+    try:
+        # Filter the results for the right row
+        output = devices[devices.device_number == output_device_name][output_names]
+
+        # Check if any value is NaN
+        if any(output.isnull()):
+            output = [0] * len(output_names)
+        else:
+            output = output.values.tolist()[0]
+    except:
+        # Default value for output is 0
+        output = [0] * len(output_names)
+
+    return output
 
 
 def list_devices(device_type=False, verbose=False):
@@ -90,7 +148,7 @@ def add_pv(device_name, section_id, ns=100, np=100, location="To"):
         section_id (String): unique identifier
         ns (Int): number of pannel in serie (* 17.3 to find voltage)
         np (Int): number of pannel in parallel (ns * np * 0.08 to find kW)
-        location (String): To or From 
+        location (String): To or From
 
     Return:
         Device (Device)
@@ -153,7 +211,7 @@ def get_voltage(devices):
         devices_voltage (DataFrame): devices and their corresponding voltage for
             each phase
     """
-    # Create a new frame to hold the results 
+    # Create a new frame to hold the results
     voltage = devices.copy()
 
     # Reset or create new columns to hold the result
@@ -184,9 +242,9 @@ def get_overload(devices):
         first_n_devices (Int): number of row to return
 
     Return:
-        overload_device (DataFrame): return the n devices with the highest load 
+        overload_device (DataFrame): return the n devices with the highest load
     """
-    # Create a new frame to hold the results 
+    # Create a new frame to hold the results
     overload = devices.copy()
 
     # Reset or create new columns to hold the result
@@ -219,7 +277,7 @@ def get_load(devices):
         devices_voltage (DataFrame): devices and their corresponding load for
             each phase
     """
-    # Create a new frame to hold the results 
+    # Create a new frame to hold the results
     load = devices.copy()
 
     # Reset or create new columns to hold the result
@@ -267,7 +325,7 @@ def get_distance(devices):
         devices_distance (DataFrame): devices and their corresponding distance from the substation
     """
     distance = devices.copy()
-    
+
     # Reset or create new columns to hold the result
     distance['distance'] = [0] * len(distance)
 
@@ -291,14 +349,14 @@ def get_unbalanced_line(devices):
         first_n_devices (Int): number of row to return
 
     Return:
-        overload_device (DataFrame): return the n devices with the highest load 
+        overload_device (DataFrame): return the n devices with the highest load
     """
     # Get all the voltage
     voltage = get_voltage(devices)
-    
+
     # Get the mean voltage accross phase
     voltage['mean_voltage_ABC'] = voltage[['voltage_A', 'voltage_B', 'voltage_C']].mean(axis=1)
-    
+
     # Get the max difference of the three phase voltage with the mean
     def _diff(value):
         diff = []
@@ -312,29 +370,29 @@ def get_unbalanced_line(devices):
 
 def get_upmu_data(inputdt, upmu_path):
     """ Retrieves instantaneous P, Q, and voltage magnitude for specified datetime.
-    
+
     Args:
         inputdt (datetime): timezone aware datetime object
         upmu_path (str): e.g., '/LBNL/grizzly_bus1/'
     Returns:
-        {'P_A': , 'Q_A': , 'P_B': , 'Q_B': , 'P_C': , 'Q_C': , 
-         'units': ('kW', 'kVAR'), 
+        {'P_A': , 'Q_A': , 'P_B': , 'Q_B': , 'P_C': , 'Q_C': ,
+         'units': ('kW', 'kVAR'),
          'VMAG_A': , 'VMAG_B': , 'VMAG_C': }
     """
-    
+
     bc = btrdb.HTTPConnection("miranda.cs.berkeley.edu")
     ur = btrdb.UUIDResolver("miranda.cs.berkeley.edu", "uuidresolver", "uuidpass", "upmu")
-    
+
     # convert dt to nanoseconds since epoch
     epochns = btrdb.date(inputdt.strftime('%Y-%m-%dT%H:%M:%S'))
-    
+
     # retrieve raw data from btrdb
     upmu_data = {}
     streams = ['L1MAG', 'L2MAG', 'L3MAG', 'C1MAG', 'C2MAG', 'C3MAG', 'L1ANG', 'L2ANG', 'L3ANG', 'C1ANG', 'C2ANG', 'C3ANG']
     for s in streams:
         pt = bc.get_stat(ur.resolve(upmu_path + s), epochns, epochns + int(9e6))
         upmu_data[s] = pt[0][2]
-        
+
     output_dict = {}
 
     output_dict['P_A'] = (upmu_data['L1MAG']*upmu_data['C1MAG']*np.cos(upmu_data['L1ANG'] - upmu_data['C1ANG']))*1e-3
