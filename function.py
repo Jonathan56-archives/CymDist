@@ -10,7 +10,7 @@ import numpy as np
 
 
 def fmu_wrapper(model_filename, input_values, input_names,
-                output_names, output_device_name, write_result):
+                output_names, output_device_names, write_result):
     """Communicate with the FMU to launch a Cymdist simulation
 
     Args:
@@ -18,7 +18,7 @@ def fmu_wrapper(model_filename, input_values, input_names,
         input_values (List): list of float with the same order as input_names
         input_names (List): list of String to describe the list of values
         output_names (List): list of String setting the value to output [voltage_A, voltage_B, ...]
-        output_device_name (String): name of a device to select one row in the results
+        output_device_names (List): list of name of devices to get output from
         write_result (Boolean): if True the entire result are saved to the file system
     """
 
@@ -50,20 +50,28 @@ def fmu_wrapper(model_filename, input_values, input_names,
         with open(model_filename + '_result_.pickle', 'wb') as output_file:
             pickle.dump(devices, output_file, protocol=2)
 
-    try:
-        # Filter the results for the right row
-        output = devices[devices.device_number == output_device_name][output_names]
+    # Filter the results for the right devices and outputs category (voltage, load, ...)
+    output_names.append('device_number')
+    output = devices[devices.device_number.isin(output_device_names)][output_names]
 
-        # Check if any value is NaN
-        if any(output.isnull()):
-            output = [0] * len(output_names)
-        else:
-            output = output.values.tolist()[0]
-    except:
-        # Default value for output is 0
-        output = [0] * len(output_names)
+    # Check if any value is NaN
+    if output.isnull().any().any():
+        output = [[0] * len(output_names) for i in len(output_device_names)]
+    else:
+        # Get the values in the right order [[1, 2, 3], [4, 5, ...]]
+        temp_output = []
+        for device_name in output_device_names:
+            temp_output.append([])
+            for category_name in output_names:
+                temp_output[-1].append(output[output.device_number == device_name].iloc[0][category_name])
+        output = temp_output
 
-    return output
+    # Convert a list of list to a list
+    output_to_fmu = []
+    for device_result in output:
+        output_to_fmu.extend(device_result)
+
+    return output_to_fmu
 
 
 def list_devices(device_type=False, verbose=False):
