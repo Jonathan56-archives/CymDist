@@ -53,6 +53,7 @@ def fmu_wrapper(model_filename, input_values, input_names,
     # Filter the results for the right devices and outputs category (voltage, load, ...)
     output_names.append('device_number')
     output = devices[devices.device_number.isin(output_device_names)][output_names]
+    del output_names[-1]  # Remove the device number from this list, no longer needed
 
     # Check if any value is NaN
     if output.isnull().any().any():
