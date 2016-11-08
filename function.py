@@ -17,9 +17,20 @@ def fmu_wrapper(model_filename, input_values, input_names,
         model_filename (String): path to the cymdist grid model
         input_values (List): list of float with the same order as input_names
         input_names (List): list of String to describe the list of values
-        output_names (List): list of String setting the value to output [voltage_A, voltage_B, ...]
-        output_device_names (List): list of name of devices to get output from
-        write_result (Boolean): if True the entire result are saved to the file system
+        output_names (List): list of String output names [voltage_A, voltage_B, ...]
+        output_device_names (List): list of String output device name (same lenght as output_names)
+        write_result (Boolean): if True the entire results are saved to the file system (add ~30secs)
+
+    Example:
+        >>> write_results = 0  # (or False)
+        >>> model_filename = 'HL0004.sxst'
+        >>> input_names = ['VMAG_A', 'VMAG_B', 'VMAG_C', 'P_A', 'P_B', 'P_C', 'Q_A', 'Q_B', 'Q_C']
+        >>> input_values = [7287, 7299, 7318, 7272, 2118, 6719, -284, -7184, 3564]
+        >>> output_names = ['voltage_A', 'voltage_B', 'voltage_C']
+        >>> output_device_names = ['HOLLISTER_2104', 'HOLLISTER_2104', 'HOLLISTER_2104']
+
+        >>> fmu_wrapper(model_filename, input_values, input_names,
+                        output_names, output_device_names, write_result)
     """
 
     # Open the model
@@ -47,32 +58,28 @@ def fmu_wrapper(model_filename, input_values, input_names,
 
     # Write full results?
     if write_result:
+        # Get the full output data (time consuming)
+        temp = list_devices()
+        temp = get_voltage(temp)
+        temp = get_overload(temp)
+        temp = get_load(temp)
+        temp = get_unbalanced_line(temp)
+        temp = get_distance(temp)
         with open(model_filename + '_result_.pickle', 'wb') as output_file:
-            pickle.dump(devices, output_file, protocol=2)
+            pickle.dump(temp, output_file, protocol=2)
 
-    # Filter the results for the right devices and outputs category (voltage, load, ...)
-    output_names.append('device_number')
-    output = devices[devices.device_number.isin(output_device_names)][output_names]
-    del output_names[-1]  # Remove the device number from this list, no longer needed
+    # Filter the result for the right outputs value
+    output = []
+    DEFAULT_VALUE = 0  # value to output in case of a NaN value
+    for device_name, category in zip(output_device_names, output_names):
+        temp = devices[devices.device_number == device_name][category]
 
-    # Check if any value is NaN
-    if output.isnull().any().any():
-        output = [[0] * len(output_names) for i in len(output_device_names)]
-    else:
-        # Get the values in the right order [[1, 2, 3], [4, 5, ...]]
-        temp_output = []
-        for device_name in output_device_names:
-            temp_output.append([])
-            for category_name in output_names:
-                temp_output[-1].append(output[output.device_number == device_name].iloc[0][category_name])
-        output = temp_output
+        if not temp.isnull().any():
+            output.append(temp.iloc[0])
+        else:
+            output.append(DEFAULT_VALUE)
 
-    # Convert a list of list to a list
-    output_to_fmu = []
-    for device_result in output:
-        output_to_fmu.extend(device_result)
-
-    return output_to_fmu
+    return output
 
 
 def list_devices(device_type=False, verbose=False):
